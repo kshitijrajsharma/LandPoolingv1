@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">Chaklabandi</string>
+    <string name="title_home">Map</string>
+    <string name="title_dashboard">Dashboard</string>
+    <string name="title_notifications">Notifications</string>
+    <string name="title_activity_maps">Map</string>
+    <string name="user_location_permission_explanation">explan</string>
+    <string name="user_location_permission_not_granted">location not granted</string>
+</resources>
