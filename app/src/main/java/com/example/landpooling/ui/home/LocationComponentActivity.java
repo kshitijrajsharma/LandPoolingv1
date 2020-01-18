@@ -12,8 +12,10 @@ import android.os.AsyncTask;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.CheckBox;
+import android.widget.LinearLayout;
 import android.widget.Toast;
 
 import com.example.landpooling.R;
@@ -25,6 +27,7 @@ import com.mapbox.geojson.Feature;
 import com.mapbox.geojson.FeatureCollection;
 import com.mapbox.mapboxsdk.Mapbox;
 import com.mapbox.mapboxsdk.annotations.IconFactory;
+import com.mapbox.mapboxsdk.annotations.Marker;
 import com.mapbox.mapboxsdk.annotations.MarkerOptions;
 import com.mapbox.mapboxsdk.camera.CameraPosition;
 import com.mapbox.mapboxsdk.camera.CameraUpdateFactory;
@@ -163,6 +166,28 @@ public class LocationComponentActivity extends AppCompatActivity implements
                             feature.getProperty("lon").getAsFloat()))
                     .snippet("X : " + feature.getStringProperty("X") + " , Y: " + feature.getStringProperty("Y") + " , Z: " + feature.getStringProperty("Z"))
                     .title(feature.getStringProperty("sn")));
+            mapboxMap.setInfoWindowAdapter(new MapboxMap.InfoWindowAdapter() {
+                @Nullable
+                @Override
+                public View getInfoWindow(@NonNull Marker marker) {
+                    LinearLayout parent = new LinearLayout(LocationComponentActivity.this);
+                    parent.setLayoutParams(new LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                    parent.setOrientation(LinearLayout.VERTICAL);
+
+                    // Depending on the marker title, the correct image source is used. If you
+                    // have many markers using different images, extending Marker and
+                    // baseMarkerOptions, adding additional options such as the image, might be
+                    // a better choice.
+                    Button Done = new Button(LocationComponentActivity.this);
+                    Done.setText("Mark");
+                    parent.addView(Done);
+                    return parent;
+
+                    // return the view which includes the button
+
+                }
+            });
         }
     }
 
