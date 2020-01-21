@@ -11,19 +11,59 @@
         app:mapbox_cameraTargetLat="28.13947"
         app:mapbox_cameraTargetLng="83.85563"
         app:mapbox_cameraZoom="15"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent" >
 
+
+    </com.mapbox.mapboxsdk.maps.MapView>
+    <ProgressBar
+        android:id="@+id/progress_bar"
+        style="@android:style/Widget.DeviceDefault.Light.ProgressBar.Horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="25dp"
+        android:layout_gravity="center"
+        android:layout_centerInParent="true"
+        android:layout_centerHorizontal="true"
+        android:background="#00DB3030"
+        android:paddingLeft="25dp"
+        android:paddingRight="25dp"
+        android:visibility="gone" />
+
+
+<RelativeLayout
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content">
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fab_layer_toggle"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="end|top"
-        android:layout_margin="20dp"
+        android:layout_alignParentRight="true"
+        android:layout_marginTop="50dp"
+        android:layout_marginEnd="10dp"
+        android:layout_marginRight="10dp"
         android:src="@drawable/ic_layers_24dp"
         tools:backgroundTint="@color/colorAccent" />
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fab_location_search"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentRight="true"
+        android:layout_below="@id/fab_layer_toggle"
+        android:layout_margin="10dp"
+        android:tint="@android:color/white"
+        app:backgroundTint="@color/colorPrimary"
+        app:srcCompat="@android:drawable/ic_search_category_default" />
+
+</RelativeLayout>
+
     <RelativeLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content">
+        <TextView
+            android:id="@+id/textView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentBottom="true"
+            android:textAppearance="@style/TextAppearance.AppCompat.Large" />
 
         <Button
             android:id="@+id/button"
@@ -52,7 +92,53 @@
             android:visibility="invisible" />
 
 
+
+
+
+
+
     </RelativeLayout>
+    <LinearLayout
+        android:id="@+id/bottom_navigation"
+        style="?android:attr/buttonBarStyle"
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:layout_gravity="bottom"
+        android:layout_alignParentBottom="true"
+        android:background="@color/colorAccent"
+        android:elevation="8dp"
+        android:orientation="horizontal"
+        android:paddingTop="8dp">
+
+        <Button
+            android:id="@+id/download_button"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@android:color/transparent"
+            android:clickable="true"
+            android:drawableTop="@color/mapbox_plugins_white"
+            android:text="Download"
+            android:textAllCaps="false"
+            android:textColor="@color/mapbox_plugins_white"
+            android:textColorHighlight="#00E40E0E"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/list_button"
+            style="?android:attr/buttonBarButtonStyle"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@android:color/transparent"
+            android:drawableTop="@color/mapbox_plugins_white"
+            android:text="List"
+            android:textAllCaps="false"
+            android:textColor="@color/mapbox_plugins_white"
+            android:textSize="12sp"/>
+
+    </LinearLayout>
 
 
 

@@ -1,21 +1,41 @@
 package com.example.landpooling.ui.home;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 import com.example.landpooling.R;
+import com.mapbox.geojson.Feature;
+import com.mapbox.geojson.FeatureCollection;
+import com.mapbox.geojson.LineString;
 import com.mapbox.mapboxsdk.Mapbox;
+import com.mapbox.mapboxsdk.annotations.Icon;
+import com.mapbox.mapboxsdk.annotations.IconFactory;
 import com.mapbox.mapboxsdk.annotations.MarkerOptions;
 import com.mapbox.mapboxsdk.geometry.LatLng;
 import com.mapbox.mapboxsdk.maps.MapView;
 import com.mapbox.mapboxsdk.maps.MapboxMap;
 import com.mapbox.mapboxsdk.maps.Style;
 import com.mapbox.mapboxsdk.maps.OnMapReadyCallback;
+import com.mapbox.mapboxsdk.style.expressions.Expression;
+import com.mapbox.mapboxsdk.style.layers.FillLayer;
+import com.mapbox.mapboxsdk.style.layers.LineLayer;
+import com.mapbox.mapboxsdk.style.layers.Property;
+import com.mapbox.mapboxsdk.style.layers.PropertyFactory;
+import com.mapbox.mapboxsdk.style.layers.SymbolLayer;
+import com.mapbox.mapboxsdk.style.sources.GeoJsonSource;
+
+import java.io.IOException;
+import java.io.InputStream;
+
+import static com.mapbox.mapboxsdk.Mapbox.getApplicationContext;
 
 
 public class HomeFragment extends Fragment  {
@@ -41,6 +61,30 @@ public class HomeFragment extends Fragment  {
                         mapboxMap.addMarker(new MarkerOptions()
                                 .position(new LatLng(28.13934, 83.85552))
                                 .title("Eiffel Tower"));
+                        String data = getAssetJsonData(getApplicationContext());
+                        FeatureCollection featureCollection = FeatureCollection.fromJson(data);
+//                        style.addSource(new GeoJsonSource("line-source",
+//                                FeatureCollection.fromFeatures(new Feature[] {Feature.fromGeometry(
+//                                        LineString.fromJson(data)
+//                                )})));
+                        GeoJsonSource geoJsonSource = new GeoJsonSource("line-source", featureCollection);
+                        style.addSource(geoJsonSource);
+//
+//                        SymbolLayer symbolLayer = new SymbolLayer("layer-id", "source-id")
+//                                .withProperties(PropertyFactory.textField(Expression.get("sn")));
+//                        style.addLayer(symbolLayer);
+                        LineLayer lineLayer = new LineLayer("line-layer", "line-source");
+
+
+                        lineLayer.setProperties(
+                                PropertyFactory.lineDasharray(new Float[]{0.01f, 2f}),
+                                PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+                                PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
+                                PropertyFactory.lineWidth(5f),
+                                PropertyFactory.lineColor(Color.parseColor("#e55e5e"))
+                        );
+
+                        style.addLayer(lineLayer);
 
                     }
                 });
@@ -48,6 +92,23 @@ public class HomeFragment extends Fragment  {
         });
         return root;
     }
+    private String getAssetJsonData(Context context) {
+        String json;
+        try {
+            InputStream is = context.getAssets().open("example.geojson");
+            int size = is.available();
+            byte[] buffer = new byte[size];
+            is.read(buffer);
+            is.close();
+            json = new String(buffer, "UTF-8");
+        } catch (IOException ex) {
+            ex.printStackTrace();
+            return null;
+        }
+        Log.e("data", json);
+        return json;
+    }
+
 
     @Override
     public void onStart() {
