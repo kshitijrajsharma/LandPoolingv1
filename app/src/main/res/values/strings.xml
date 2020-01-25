@@ -1,27 +1,28 @@
 <resources>
-    <string name="app_name">Chaklabandi</string>
+    <string name="app_name">चक्लाबन्दी</string>
     <string name="title_home">Map</string>
     <string name="title_dashboard">Dashboard</string>
     <string name="title_notifications">Notifications</string>
     <string name="title_activity_maps">Map</string>
-    <string name="user_location_permission_explanation">explan</string>
+    <string name="user_location_permission_explanation">App wants to know your location</string>
     <string name="user_location_permission_not_granted">location not granted</string>
     <string name="access_token">pk.eyJ1Ijoic2tzaGl0aXoxIiwiYSI6ImNqcmJ2czBjODBhMTgzeWxwM2t1djJuaXUifQ.wlFktg-soH3B_pqVyJj2Ig</string>
-    <string name="dialog_title">Name new region</string>
-    <string name="dialog_message">Downloads the map region you currently are viewing</string>
+    <string name="dialog_title">Name your New Site</string>
+    <string name="dialog_message">Downloads the map region that you are viewing.</string>
     <string name="dialog_positive_button">Download</string>
     <string name="dialog_negative_button">Cancel</string>
     <string name="dialog_toast">Region name cannot be empty.</string>
-    <string name="end_progress_success">Region downloaded successfully.</string>
-    <string name="toast_no_regions_yet">You have no regions yet.</string>
-    <string name="toast_region_deleted">Region deleted</string>
-    <string name="navigate_positive_button">Navigate to</string>
+    <string name="end_progress_success">Site downloaded successfully.</string>
+    <string name="toast_no_regions_yet">You have no sites yet.</string>
+    <string name="toast_region_deleted">Site deleted</string>
+    <string name="navigate_positive_button">Navigate to Site</string>
     <string name="navigate_neutral_button_title">Delete</string>
     <string name="navigate_negative_button_title">Cancel</string>
     <string name="navigate_title">List</string>
-    <string name="region_name">Region %1$d</string>
+    <string name="region_name">Sute %1$d</string>
     <string name="set_region_name_hint">Enter name</string>
 
     <!--SimpleOfflineMapActivity activity-->
-    <string name="simple_offline_end_progress_success">Region downloaded successfully.</string>
+    <string name="simple_offline_end_progress_success">Site Region downloaded successfully.</string>
+    <string name="clicked_symbol_toast">Symbol clicked</string>
 </resources>

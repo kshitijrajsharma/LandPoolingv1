@@ -61,7 +61,8 @@ public class HomeFragment extends Fragment  {
                         mapboxMap.addMarker(new MarkerOptions()
                                 .position(new LatLng(28.13934, 83.85552))
                                 .title("Eiffel Tower"));
-                        String data = getAssetJsonData(getApplicationContext());
+                        String file="example.geojson";
+                        String data = getAssetJsonData(getApplicationContext(),file);
                         FeatureCollection featureCollection = FeatureCollection.fromJson(data);
 //                        style.addSource(new GeoJsonSource("line-source",
 //                                FeatureCollection.fromFeatures(new Feature[] {Feature.fromGeometry(
@@ -92,10 +93,10 @@ public class HomeFragment extends Fragment  {
         });
         return root;
     }
-    private String getAssetJsonData(Context context) {
+    private String getAssetJsonData(Context context,String filename) {
         String json;
         try {
-            InputStream is = context.getAssets().open("example.geojson");
+            InputStream is = context.getAssets().open(filename);
             int size = is.available();
             byte[] buffer = new byte[size];
             is.read(buffer);

@@ -4,6 +4,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.UiThread;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 
 
 import android.app.Activity;
@@ -11,6 +12,7 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 
@@ -18,6 +20,8 @@ import android.graphics.Color;
 import android.location.Location;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Environment;
+import android.text.InputType;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
@@ -68,6 +72,8 @@ import com.mapbox.mapboxsdk.offline.OfflineRegion;
 import com.mapbox.mapboxsdk.offline.OfflineRegionError;
 import com.mapbox.mapboxsdk.offline.OfflineRegionStatus;
 import com.mapbox.mapboxsdk.offline.OfflineTilePyramidRegionDefinition;
+import com.mapbox.mapboxsdk.plugins.annotation.OnSymbolClickListener;
+import com.mapbox.mapboxsdk.plugins.annotation.Symbol;
 import com.mapbox.mapboxsdk.plugins.annotation.SymbolManager;
 import com.mapbox.mapboxsdk.plugins.places.autocomplete.PlaceAutocomplete;
 import com.mapbox.mapboxsdk.plugins.places.autocomplete.model.PlaceOptions;
@@ -82,6 +88,8 @@ import com.mapbox.mapboxsdk.style.sources.RasterDemSource;
 
 import org.json.JSONObject;
 
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.ref.WeakReference;
@@ -92,6 +100,8 @@ import java.util.Scanner;
 
 import timber.log.Timber;
 
+import static com.mapbox.mapboxsdk.Mapbox.getApplicationContext;
+import static com.mapbox.mapboxsdk.style.layers.Property.ICON_TEXT_FIT_BOTH;
 import static com.mapbox.mapboxsdk.style.layers.PropertyFactory.iconImage;
 import static com.mapbox.mapboxsdk.style.layers.PropertyFactory.iconOffset;
 import static com.mapbox.mapboxsdk.style.layers.PropertyFactory.hillshadeHighlightColor;
@@ -102,6 +112,8 @@ public class LocationComponentActivity extends AppCompatActivity implements
         OnMapReadyCallback, PermissionsListener {
 
     private static final String TAG = "OffManActivity";
+    private SharedPreferences mSharedPreferences;
+    private SharedPreferences.Editor mEditor;
 
     // JSON encoding/decoding
     public static final String JSON_CHARSET = "UTF-8";
@@ -120,149 +132,116 @@ public class LocationComponentActivity extends AppCompatActivity implements
     // Offline objects
     private OfflineManager offlineManager;
     private OfflineRegion offlineRegion;
-    private static final String SAVED_STATE_CAMERA = "saved_state_camera";
-    private static final String SAVED_STATE_RENDER = "saved_state_render";
-    private static final String SAVED_STATE_LOCATION = "saved_state_location";
 
-    private Button locationModeBtn;
-    private Button locationTrackingBtn;
     private PermissionsManager permissionsManager;
-    private LocationComponent locationComponent;
 
     private MapboxMap mapboxMap;
-    private Location lastLocation;
+
     private static final String LAYER_ID = "hillshade-layer";
     private static final String SOURCE_ID = "hillshade-source";
     private static final String SOURCE_URL = "mapbox://mapbox.terrain-rgb";
     private static final String HILLSHADE_HIGHLIGHT_COLOR = "#008924";
-    private float locate;
     private Button one;
+
     private Button three;
     private Button two;
     public TextView poicount;
     public int count=0;
+    public int satellite=0;
     public int initialcount=0;
     private static final int REQUEST_CODE_AUTOCOMPLETE = 1;
     private CarmenFeature home;
     private CarmenFeature work;
     private String geojsonSourceLayerId = "geojsonSourceLayerId";
     private String symbolIconId = "symbolIconId";
+    private File apkStorage=null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+        getSupportActionBar().setHomeButtonEnabled(true);
+        getSupportActionBar().setHomeAsUpIndicator(R.drawable.branded);
 
         super.onCreate(savedInstanceState);
         Mapbox.getInstance(this, "pk.eyJ1Ijoic2tzaGl0aXoxIiwiYSI6ImNqcmJ2czBjODBhMTgzeWxwM2t1djJuaXUifQ.wlFktg-soH3B_pqVyJj2Ig");
         setContentView(R.layout.fragment_home);
         mapView = findViewById(R.id.mapView);
-        one=findViewById(R.id.button);
-        two=findViewById(R.id.button2);
-        three=findViewById(R.id.button3);
         poicount=findViewById(R.id.textView);
         mapView.onCreate(savedInstanceState);
 
         mapView.getMapAsync(this);
+        converter();
+
+        createFile();
     }
     @Override
     public void onMapReady(@NonNull final MapboxMap mapboxMap) {
         map=mapboxMap;
 
+
         LocationComponentActivity.this.mapboxMap = mapboxMap;
-
-
-
-
-
-
         mapboxMap.setStyle(Style.OUTDOORS, new Style.OnStyleLoaded() {
-
-
-
-
 
 //        mapboxMap.setStyle(new Style.Builder().fromUri("mapbox://styles/mapbox/cjerxnqt3cgvp2rmyuxbeqme7"),
 //                new Style.OnStyleLoaded() {
                     @Override
                     public void onStyleLoaded(@NonNull Style style) {
-
-
-
-
                         initSearchFab();
-
+                        getlocation();
                         addUserLocations();
 
 // Add the symbol layer icon to map for future use
                         style.addImage(symbolIconId, BitmapFactory.decodeResource(
                                 LocationComponentActivity.this.getResources(), R.drawable.blue_marker));
-
 // Create an empty GeoJSON source using the empty feature collection
                         setUpSource(style);
-
 // Set up a new symbol layer for displaying the searched location's feature coordinates
                         setupLayer(style);
-
                         RasterDemSource rasterDemSource = new RasterDemSource(SOURCE_ID, SOURCE_URL);
                         style.addSource(rasterDemSource);
-
 // Create and style a hillshade layer to add to the map
                         HillshadeLayer hillshadeLayer = new HillshadeLayer(LAYER_ID, SOURCE_ID).withProperties(
                                 hillshadeHighlightColor(Color.parseColor(HILLSHADE_HIGHLIGHT_COLOR)),
                                 hillshadeShadowColor(Color.BLACK)
                         );
-
 // Add the hillshade layer to the map
                         style.addLayerBelow(hillshadeLayer, "aerialway");
-
-
                         findViewById(R.id.fab_layer_toggle).setOnClickListener(new View.OnClickListener(){
                             @Override
                             public void onClick(View view) {
-                                mapboxMap.setStyle(new Style.Builder().fromUri("mapbox://styles/skshitiz1/ck56ftzf60etl1cmsekqt4tv9"),
-                                        new Style.OnStyleLoaded() {
-                                            @Override
-                                            public void onStyleLoaded(@NonNull Style style) {
-                                                String data = getAssetJsonData(getApplicationContext());
-                                                FeatureCollection featureCollection = FeatureCollection.fromJson(data);
-                                                GeoJsonSource geoJsonSource = new GeoJsonSource("source-id", featureCollection);
-                                                style.addSource(geoJsonSource);
-
-                                                SymbolLayer symbolLayer = new SymbolLayer("layer-id", "source-id")
-                                                        .withProperties(PropertyFactory.textField(Expression.get("sn")));
-                                                style.addLayer(symbolLayer);
+                                showAlertDialog();
 
 
-//                                                SymbolManager symbolManager = new SymbolManager(mapView, mapboxMap, style);
 
 
                                             }
                                         });
+                        findViewById(R.id.toggle).setOnClickListener(new View.OnClickListener() {
 
+                                                                         @Override
+                                                                         public void onClick(View view) {
+                                                                             satellite=satellite+1;
+                                                                             if(satellite%2==0){
+                                                                                 mapboxMap.setStyle(Style.OUTDOORS, new Style.OnStyleLoaded() {
+                                                                                     @Override
+                                                                                     public void onStyleLoaded(@NonNull Style style) {
 
-                                if (one.getVisibility() == View.VISIBLE) {
-                                    // Its visible
-                                    one.setVisibility(View.INVISIBLE);
-                                } else {
-                                    // Either gone or invisible
-                                    one.setVisibility(View.VISIBLE);
-                                }
-                                if (two.getVisibility() == View.VISIBLE) {
-                                    // Its visible
-                                    two.setVisibility(View.INVISIBLE);
-                                } else {
-                                    // Either gone or invisible
-                                    two.setVisibility(View.VISIBLE);
-                                }
-                                if (three.getVisibility() == View.VISIBLE) {
-                                    // Its visible
-                                    three.setVisibility(View.INVISIBLE);
-                                } else {
-                                    // Either gone or invisible
-                                    three.setVisibility(View.VISIBLE);
-                                }
+                                                                                     }
+                                                                                 });
 
-                            }
-                        });
+                                                                             }else{
+                                                                                 mapboxMap.setStyle(Style.SATELLITE_STREETS, new Style.OnStyleLoaded() {
+                                                                                     @Override
+                                                                                     public void onStyleLoaded(@NonNull Style style) {
+
+                                                                                     }
+                                                                                 });
+
+                                                                             }
+
+                                                                         }
+                                                                     });
+
                         progressBar = findViewById(R.id.progress_bar);
 
 // Set up the offlineManager
@@ -292,6 +271,235 @@ public class LocationComponentActivity extends AppCompatActivity implements
 
                 });
     }
+    public void converter() {
+        findViewById(R.id.converter).setOnClickListener(new View.OnClickListener() {
+            private String m_Text = "";
+
+            @Override
+            public void onClick(View v) {
+                Toast.makeText(LocationComponentActivity.this, "I am from the converter", Toast.LENGTH_LONG).show();
+                AlertDialog.Builder builder = new AlertDialog.Builder(LocationComponentActivity.this);
+                builder.setTitle("Meter Square to Ropani");
+                Context context = v.getContext();
+                LinearLayout layout = new LinearLayout(context);
+                layout.setOrientation(LinearLayout.VERTICAL);
+//
+//// Add a TextView here for the "Title" label, as noted in the comments
+//                final EditText titleBox = new EditText(context);
+//                titleBox.setHint("Title");
+//                layout.addView(titleBox); // Notice this is an add method
+//
+//// Add another TextView here for the "Description" label
+//                final EditText descriptionBox = new EditText(context);
+//                descriptionBox.setHint("Description");
+//                layout.addView(descriptionBox); // Another add method
+//
+//
+
+// Set up the input
+                final EditText input = new EditText(LocationComponentActivity.this);
+// Specify the type of input expected; this, for example, sets the input as a password, and will mask the text
+//                input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+                layout.addView(input);
+                final TextView output= new TextView(LocationComponentActivity.this);
+
+                final Button newbutton= new Button(LocationComponentActivity.this);
+                newbutton.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        m_Text=input.getText().toString();
+                        Double f1 = Double.parseDouble(m_Text);
+                        Double ropani=f1*0.0019656406022723;
+                        output.setText(ropani.toString());
+
+
+                    }
+                });
+
+                newbutton.setText("Clickme");
+                layout.addView(newbutton);
+
+                layout.addView(output);
+                builder.setView(layout);
+
+
+
+// Set up the buttons
+                builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        m_Text = input.getText().toString();
+                    }
+                });
+                builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+                        dialog.cancel();
+                    }
+                });
+
+                builder.show();
+
+            }
+        });
+
+    }
+
+
+
+
+
+    private void showAlertDialog() {
+        AlertDialog.Builder alertDialog = new AlertDialog.Builder(LocationComponentActivity.this);
+        alertDialog.setTitle("Select Layers");
+                String[] items = {"Design Guthhim","Point Guthhim","Data Structures","HTML","CSS"};
+                boolean[] checkedItems = {false, false, false, false, false,false};
+
+                alertDialog.setMultiChoiceItems(items, checkedItems, new DialogInterface.OnMultiChoiceClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which, boolean isChecked) {
+
+                        switch (which) {
+                            case 0:
+                                if(isChecked)
+                                    Toast.makeText(LocationComponentActivity.this, "Clicked on Design Guthhim", Toast.LENGTH_LONG).show();
+                                String file="example.geojson";
+                                jsonbackground(file,"line");
+
+
+                                break;
+                            case 1:
+                                if(isChecked)
+                                    Toast.makeText(LocationComponentActivity.this, "Clicked on Point Guthhim", Toast.LENGTH_LONG).show();
+                                String filenew="poi.geojson";
+                                jsonbackground(filenew,"point");
+
+                                break;
+                            case 2:
+                                if(isChecked)
+                                    Toast.makeText(LocationComponentActivity.this, "Clicked on Data Structures", Toast.LENGTH_LONG).show();
+                                break;
+                            case 3:
+                                if(isChecked)
+                                    Toast.makeText(LocationComponentActivity.this, "Clicked on HTML", Toast.LENGTH_LONG).show();
+                                break;
+                            case 4:
+                                if(isChecked)
+                                    Toast.makeText(LocationComponentActivity.this, "Clicked on CSS", Toast.LENGTH_LONG).show();
+                                break;
+                        }
+                    }
+                });
+                AlertDialog alert = alertDialog.create();
+                alert.setCanceledOnTouchOutside(false);
+
+                alert.show();
+
+
+
+
+
+
+
+    }
+
+    public void createFile() {
+        try {
+            if (new CheckForSDCard().isSDCardPresent()) {
+
+                apkStorage = new File(Environment.getExternalStorageDirectory() + "/" + "Chaklabandi");
+            } else
+                Toast.makeText(this, "Oops!! There is no SD Card.", Toast.LENGTH_SHORT).show();
+
+
+            if (!apkStorage.exists()) {
+                apkStorage.mkdir();
+                Toast.makeText(LocationComponentActivity.this, "Dir created"+apkStorage, Toast.LENGTH_LONG).show();
+                Log.e("file dir", "dir"+apkStorage);
+            }
+
+            FileWriter file = new FileWriter(apkStorage + "/filename");
+            file.write("what you want to write in internal storage");
+            file.flush();
+            file.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+    public class CheckForSDCard {
+        //Check If SD Card is present or not method
+        public boolean isSDCardPresent() {
+            if (Environment.getExternalStorageState().equals(
+                    Environment.MEDIA_MOUNTED)) {
+                return true;
+            }
+            return false;
+        }
+    }
+    public void jsonbackground(String fileename, String filetype){
+        mapboxMap.getStyle(new Style.OnStyleLoaded() {
+            @Override
+            public void onStyleLoaded(@NonNull Style style) {
+                String data = getAssetJsonData(getApplicationContext(),fileename);
+                FeatureCollection featureCollection = FeatureCollection.fromJson(data);
+
+
+//
+
+                if(filetype=="line"){
+                    if (style.getSourceAs("line-source")!=null){
+
+
+                    }
+                    else{
+                        style.removeLayer("line-layer");
+                        GeoJsonSource geoJsonSource = new GeoJsonSource("line-source", featureCollection);
+                        style.addSource(geoJsonSource);
+                        LineLayer lineLayer = new LineLayer("line-layer", "line-source");
+                        lineLayer.setProperties(
+//                                PropertyFactory.lineDasharray(new Float[]{0.01f, 2f}),
+                                PropertyFactory.lineCap(Property.LINE_CAP_SQUARE),
+                                PropertyFactory.lineJoin(Property.LINE_JOIN_MITER),
+                                PropertyFactory.lineWidth(2f),
+                                PropertyFactory.lineOpacity(.7f),
+                                PropertyFactory.lineColor(Color.parseColor("#e55e5e"))
+
+                        );
+                        style.addLayer(lineLayer);
+                    }
+
+                }
+                else if(filetype=="point"){
+
+
+                    if (style.getSourceAs("point-source")!=null){
+
+
+                    }
+                    else{
+                        style.removeLayer("layer-id");
+                        GeoJsonSource geoJsonSource = new GeoJsonSource("point-source", featureCollection);
+                        style.addSource(geoJsonSource);
+                        style.addImage(("marker_icon"), BitmapFactory.decodeResource(
+                                getResources(), R.drawable.red_marker));
+                        SymbolLayer symbolLayer = new SymbolLayer("layer-id", "point-source")
+                                .withProperties(PropertyFactory.iconImage("marker_icon"),PropertyFactory.textField(Expression.get("sn")),PropertyFactory.iconOffset(new Float[] {0f, -8f}));
+                        style.addLayer(symbolLayer);
+
+
+                    }
+
+                }
+
+            }
+        });
+
+
+
+
+    }
+
+
     private void initSearchFab() {
         findViewById(R.id.fab_location_search).setOnClickListener(new View.OnClickListener() {
             @Override
@@ -369,21 +577,30 @@ public class LocationComponentActivity extends AppCompatActivity implements
         }
     }
 
-    public  void locationbuttonclick(View view){
-        mapboxMap.getStyle(new Style.OnStyleLoaded() {
-            @Override
-            public void onStyleLoaded(@NonNull Style style) {
 
-                enableLocationComponent(style);
+    public  void getlocation(){
+        findViewById(R.id.locationbutton).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                mapboxMap.getStyle(new Style.OnStyleLoaded() {
+                    @Override
+                    public void onStyleLoaded(@NonNull Style style) {
+
+                        enableLocationComponent(style);
+
+                    }
+                });
 
             }
         });
+
     }
     public  void designbuttonclick(View view){
         new LoadGeoJson(this).execute();
     }
     public  void pointbuttonclick(View view) {
-        String data = getAssetJsonData(getApplicationContext());
+        String file="poi.geojson";
+        String data = getAssetJsonData(getApplicationContext(),file);
         FeatureCollection featureCollection = FeatureCollection.fromJson(data);
         IconFactory iconFactory = IconFactory.getInstance(LocationComponentActivity.this);
         Icon icon = iconFactory.fromResource(R.drawable.blue_marker);
@@ -474,10 +691,10 @@ public class LocationComponentActivity extends AppCompatActivity implements
     }
 
 
-    private String getAssetJsonData(Context context) {
+    private String getAssetJsonData(Context context,String filename) {
         String json;
         try {
-            InputStream is = context.getAssets().open("poi.geojson");
+            InputStream is = context.getAssets().open(filename);
             int size = is.available();
             byte[] buffer = new byte[size];
             is.read(buffer);
@@ -617,6 +834,7 @@ public class LocationComponentActivity extends AppCompatActivity implements
     public void onResume() {
         super.onResume();
         mapView.onResume();
+
     }
 
     @Override
