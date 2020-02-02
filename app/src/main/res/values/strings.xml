@@ -25,4 +25,5 @@
     <!--SimpleOfflineMapActivity activity-->
     <string name="simple_offline_end_progress_success">Site Region downloaded successfully.</string>
     <string name="clicked_symbol_toast">Symbol clicked</string>
+    <string name="new_location">New</string>
 </resources>

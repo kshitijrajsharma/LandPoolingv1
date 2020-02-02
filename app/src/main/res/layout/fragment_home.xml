@@ -27,8 +27,6 @@
     <com.mapbox.mapboxsdk.maps.MapView
         android:id="@+id/mapView"
         android:layout_width="match_parent"
-        app:mapbox_cameraTargetLat="28.13947"
-        app:mapbox_cameraTargetLng="83.85563"
         app:mapbox_cameraZoom="15"
         android:layout_height="match_parent" >
 
@@ -103,7 +101,7 @@
         android:layout_marginEnd="10dp"
         android:layout_marginTop="10dp"
         android:layout_marginRight="10dp"
-        app:srcCompat="@android:drawable/ic_media_pause"
+        app:srcCompat="@android:drawable/ic_menu_rotate"
         app:backgroundTint="@color/textColorPrimary"
         />
     <TextView
@@ -113,7 +111,6 @@
         android:layout_below="@id/locationbutton"
         android:layout_marginEnd="10dp"
         android:layout_marginRight="10dp"
-        android:text="Remaining: 2"
         android:textColor="@color/mapbox_plugins_white"
         android:background="@drawable/white_circle_drawable"
 

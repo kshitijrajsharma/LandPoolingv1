@@ -2,11 +2,11 @@ package com.example.landpooling.ui.home;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.annotation.UiThread;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.Toolbar;
+import cn.pedant.SweetAlert.SweetAlertDialog;
 
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
@@ -17,21 +17,18 @@ import android.graphics.BitmapFactory;
 import android.graphics.Color;
 
 
+import android.graphics.PointF;
 import android.location.Location;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
-import android.text.InputType;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
-import android.widget.CheckBox;
 import android.widget.EditText;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.ListPopupWindow;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -39,7 +36,11 @@ import android.widget.Toast;
 import com.example.landpooling.R;
 
 import com.google.gson.JsonObject;
+import com.mapbox.android.core.location.LocationEngine;
+import com.mapbox.android.core.location.LocationEngineCallback;
+import com.mapbox.android.core.location.LocationEngineProvider;
 import com.mapbox.android.core.location.LocationEngineRequest;
+import com.mapbox.android.core.location.LocationEngineResult;
 import com.mapbox.android.core.permissions.PermissionsListener;
 import com.mapbox.android.core.permissions.PermissionsManager;
 import com.mapbox.api.geocoding.v5.models.CarmenFeature;
@@ -58,12 +59,10 @@ import com.mapbox.mapboxsdk.geometry.LatLng;
 import com.mapbox.mapboxsdk.geometry.LatLngBounds;
 import com.mapbox.mapboxsdk.location.LocationComponent;
 import com.mapbox.mapboxsdk.location.LocationComponentActivationOptions;
-import com.mapbox.mapboxsdk.location.OnLocationCameraTransitionListener;
 import com.mapbox.mapboxsdk.location.modes.CameraMode;
 import com.mapbox.mapboxsdk.location.modes.RenderMode;
 import com.mapbox.mapboxsdk.maps.MapView;
 import com.mapbox.mapboxsdk.maps.MapboxMap;
-import com.mapbox.mapboxsdk.maps.MapboxMapOptions;
 import com.mapbox.mapboxsdk.maps.OnMapReadyCallback;
 import com.mapbox.mapboxsdk.maps.Style;
 
@@ -72,9 +71,6 @@ import com.mapbox.mapboxsdk.offline.OfflineRegion;
 import com.mapbox.mapboxsdk.offline.OfflineRegionError;
 import com.mapbox.mapboxsdk.offline.OfflineRegionStatus;
 import com.mapbox.mapboxsdk.offline.OfflineTilePyramidRegionDefinition;
-import com.mapbox.mapboxsdk.plugins.annotation.OnSymbolClickListener;
-import com.mapbox.mapboxsdk.plugins.annotation.Symbol;
-import com.mapbox.mapboxsdk.plugins.annotation.SymbolManager;
 import com.mapbox.mapboxsdk.plugins.places.autocomplete.PlaceAutocomplete;
 import com.mapbox.mapboxsdk.plugins.places.autocomplete.model.PlaceOptions;
 import com.mapbox.mapboxsdk.style.expressions.Expression;
@@ -85,23 +81,26 @@ import com.mapbox.mapboxsdk.style.layers.SymbolLayer;
 import com.mapbox.mapboxsdk.style.sources.GeoJsonSource;
 import com.mapbox.mapboxsdk.style.layers.HillshadeLayer;
 import com.mapbox.mapboxsdk.style.sources.RasterDemSource;
+import com.mapbox.mapboxsdk.style.sources.Source;
 
 import org.json.JSONObject;
 
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.ref.WeakReference;
 
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 
 import timber.log.Timber;
 
-import static com.mapbox.mapboxsdk.Mapbox.getApplicationContext;
-import static com.mapbox.mapboxsdk.style.layers.Property.ICON_TEXT_FIT_BOTH;
+import static com.mapbox.mapboxsdk.style.layers.PropertyFactory.backgroundOpacity;
 import static com.mapbox.mapboxsdk.style.layers.PropertyFactory.iconImage;
 import static com.mapbox.mapboxsdk.style.layers.PropertyFactory.iconOffset;
 import static com.mapbox.mapboxsdk.style.layers.PropertyFactory.hillshadeHighlightColor;
@@ -109,7 +108,7 @@ import static com.mapbox.mapboxsdk.style.layers.PropertyFactory.hillshadeShadowC
 
 
 public class LocationComponentActivity extends AppCompatActivity implements
-        OnMapReadyCallback, PermissionsListener {
+        OnMapReadyCallback, PermissionsListener, MapboxMap.OnMarkerClickListener {
 
     private static final String TAG = "OffManActivity";
     private SharedPreferences mSharedPreferences;
@@ -134,6 +133,10 @@ public class LocationComponentActivity extends AppCompatActivity implements
     private OfflineRegion offlineRegion;
 
     private PermissionsManager permissionsManager;
+    private LocationEngine locationEngine;
+    private long DEFAULT_INTERVAL_IN_MILISECONDS =1000L;
+    private long DEFAULT_MAX_WAIT_TIME= DEFAULT_INTERVAL_IN_MILISECONDS*5;
+    private LocationComponentActivityLocationCallback callback= new LocationComponentActivityLocationCallback(this);
 
     private MapboxMap mapboxMap;
 
@@ -154,6 +157,8 @@ public class LocationComponentActivity extends AppCompatActivity implements
     private CarmenFeature work;
     private String geojsonSourceLayerId = "geojsonSourceLayerId";
     private String symbolIconId = "symbolIconId";
+    private String status = "Unmarked";
+    private int totalpoi=0;
     private File apkStorage=null;
 
     @Override
@@ -167,19 +172,19 @@ public class LocationComponentActivity extends AppCompatActivity implements
         setContentView(R.layout.fragment_home);
         mapView = findViewById(R.id.mapView);
         poicount=findViewById(R.id.textView);
-        mapView.onCreate(savedInstanceState);
-
-        mapView.getMapAsync(this);
         converter();
-
         createFile();
+        mapView.onCreate(savedInstanceState);
+        mapView.getMapAsync(this);
+
     }
+
     @Override
     public void onMapReady(@NonNull final MapboxMap mapboxMap) {
         map=mapboxMap;
-
-
         LocationComponentActivity.this.mapboxMap = mapboxMap;
+
+
         mapboxMap.setStyle(Style.OUTDOORS, new Style.OnStyleLoaded() {
 
 //        mapboxMap.setStyle(new Style.Builder().fromUri("mapbox://styles/mapbox/cjerxnqt3cgvp2rmyuxbeqme7"),
@@ -187,8 +192,7 @@ public class LocationComponentActivity extends AppCompatActivity implements
                     @Override
                     public void onStyleLoaded(@NonNull Style style) {
                         initSearchFab();
-                        getlocation();
-                        addUserLocations();
+
 
 // Add the symbol layer icon to map for future use
                         style.addImage(symbolIconId, BitmapFactory.decodeResource(
@@ -206,14 +210,19 @@ public class LocationComponentActivity extends AppCompatActivity implements
                         );
 // Add the hillshade layer to the map
                         style.addLayerBelow(hillshadeLayer, "aerialway");
+                        findViewById(R.id.locationbutton).setOnClickListener(new View.OnClickListener() {
+                            @Override
+                            public void onClick(View v) {
+                                Style style = mapboxMap.getStyle();
+                                enableLocationComponent(style);
+                            }
+
+
+                        });
                         findViewById(R.id.fab_layer_toggle).setOnClickListener(new View.OnClickListener(){
                             @Override
                             public void onClick(View view) {
                                 showAlertDialog();
-
-
-
-
                                             }
                                         });
                         findViewById(R.id.toggle).setOnClickListener(new View.OnClickListener() {
@@ -243,10 +252,8 @@ public class LocationComponentActivity extends AppCompatActivity implements
                                                                      });
 
                         progressBar = findViewById(R.id.progress_bar);
-
 // Set up the offlineManager
                         offlineManager = OfflineManager.getInstance(LocationComponentActivity.this);
-
 // Bottom navigation bar button clicks are handled here.
 // Download offline button
                         downloadButton = findViewById(R.id.download_button);
@@ -256,7 +263,6 @@ public class LocationComponentActivity extends AppCompatActivity implements
                                 downloadRegionDialog();
                             }
                         });
-
 // List offline regions
                         listButton =  findViewById(R.id.list_button);
                         listButton.setOnClickListener(new View.OnClickListener() {
@@ -267,70 +273,57 @@ public class LocationComponentActivity extends AppCompatActivity implements
                         });
 
 
+
                     }
 
                 });
     }
     public void converter() {
         findViewById(R.id.converter).setOnClickListener(new View.OnClickListener() {
+
             private String m_Text = "";
 
             @Override
             public void onClick(View v) {
-                Toast.makeText(LocationComponentActivity.this, "I am from the converter", Toast.LENGTH_LONG).show();
                 AlertDialog.Builder builder = new AlertDialog.Builder(LocationComponentActivity.this);
                 builder.setTitle("Meter Square to Ropani");
                 Context context = v.getContext();
                 LinearLayout layout = new LinearLayout(context);
                 layout.setOrientation(LinearLayout.VERTICAL);
-//
-//// Add a TextView here for the "Title" label, as noted in the comments
-//                final EditText titleBox = new EditText(context);
-//                titleBox.setHint("Title");
-//                layout.addView(titleBox); // Notice this is an add method
-//
-//// Add another TextView here for the "Description" label
-//                final EditText descriptionBox = new EditText(context);
-//                descriptionBox.setHint("Description");
-//                layout.addView(descriptionBox); // Another add method
-//
-//
-
-// Set up the input
                 final EditText input = new EditText(LocationComponentActivity.this);
+                input.setHint("Enter Area in Meter Square");
 // Specify the type of input expected; this, for example, sets the input as a password, and will mask the text
 //                input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
                 layout.addView(input);
                 final TextView output= new TextView(LocationComponentActivity.this);
-
+                output.setText("0");
                 final Button newbutton= new Button(LocationComponentActivity.this);
                 newbutton.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
                         m_Text=input.getText().toString();
-                        Double f1 = Double.parseDouble(m_Text);
-                        Double ropani=f1*0.0019656406022723;
-                        output.setText(ropani.toString());
 
-
+                        if(input.getText()!=null && !TextUtils.isEmpty(m_Text)){
+                            Double f1 = Double.parseDouble(m_Text);
+                            Double ropani=f1*0.0019656406022723;
+                            output.setText(ropani.toString()+" Ropani");
+                        }
+                        else{
+                            Toast.makeText(LocationComponentActivity.this, "Enter Area First", Toast.LENGTH_LONG).show();
+                        }
                     }
                 });
-
                 newbutton.setText("Clickme");
                 layout.addView(newbutton);
-
                 layout.addView(output);
                 builder.setView(layout);
-
-
-
 // Set up the buttons
-                builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
-                    @Override
-                    public void onClick(DialogInterface dialog, int which) {
-                        m_Text = input.getText().toString();
-                    }
-                });
+//                builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+//                    @Override
+//                    public void onClick(DialogInterface dialog, int which) {
+//                        m_Text = input.getText().toString();
+//                    }
+//                });
                 builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
@@ -342,17 +335,11 @@ public class LocationComponentActivity extends AppCompatActivity implements
 
             }
         });
-
     }
-
-
-
-
-
     private void showAlertDialog() {
         AlertDialog.Builder alertDialog = new AlertDialog.Builder(LocationComponentActivity.this);
         alertDialog.setTitle("Select Layers");
-                String[] items = {"Design Guthhim","Point Guthhim","Data Structures","HTML","CSS"};
+                String[] items = {"Point block2","Point block1","Seratar Block 1","Seratar Block 2","Seratar Block 3","POI Block 3"};
                 boolean[] checkedItems = {false, false, false, false, false,false};
 
                 alertDialog.setMultiChoiceItems(items, checkedItems, new DialogInterface.OnMultiChoiceClickListener() {
@@ -363,29 +350,39 @@ public class LocationComponentActivity extends AppCompatActivity implements
                             case 0:
                                 if(isChecked)
                                     Toast.makeText(LocationComponentActivity.this, "Clicked on Design Guthhim", Toast.LENGTH_LONG).show();
-                                String file="example.geojson";
-                                jsonbackground(file,"line");
-
-
+                                    String file="poiblock2.geojson";
+                                    jsonbackground(file,"point");
                                 break;
                             case 1:
                                 if(isChecked)
                                     Toast.makeText(LocationComponentActivity.this, "Clicked on Point Guthhim", Toast.LENGTH_LONG).show();
-                                String filenew="poi.geojson";
+                                String filenew="poiblock1.geojson";
                                 jsonbackground(filenew,"point");
 
                                 break;
                             case 2:
                                 if(isChecked)
                                     Toast.makeText(LocationComponentActivity.this, "Clicked on Data Structures", Toast.LENGTH_LONG).show();
+                                    String serafile="block1seratar.geojson";
+                                    jsonbackground(serafile,"line");
                                 break;
                             case 3:
                                 if(isChecked)
                                     Toast.makeText(LocationComponentActivity.this, "Clicked on HTML", Toast.LENGTH_LONG).show();
+                                String sera2file="block2seratar.geojson";
+                                jsonbackground(sera2file,"line");
                                 break;
                             case 4:
                                 if(isChecked)
                                     Toast.makeText(LocationComponentActivity.this, "Clicked on CSS", Toast.LENGTH_LONG).show();
+                                String sera3file="block3seratar.geojson";
+                                jsonbackground(sera3file,"line");
+                                break;
+                            case 5:
+                                if(isChecked)
+                                    Toast.makeText(LocationComponentActivity.this, "Clicked on 3", Toast.LENGTH_LONG).show();
+                                String sera4file="poiblock3.geojson";
+                                jsonbackground(sera4file,"point");
                                 break;
                         }
                     }
@@ -394,38 +391,63 @@ public class LocationComponentActivity extends AppCompatActivity implements
                 alert.setCanceledOnTouchOutside(false);
 
                 alert.show();
-
-
-
-
-
-
-
     }
 
     public void createFile() {
-        try {
-            if (new CheckForSDCard().isSDCardPresent()) {
+        if (new CheckForSDCard().isSDCardPresent()) {
 
-                apkStorage = new File(Environment.getExternalStorageDirectory() + "/" + "Chaklabandi");
-            } else
-                Toast.makeText(this, "Oops!! There is no SD Card.", Toast.LENGTH_SHORT).show();
+            apkStorage = new File(Environment.getExternalStorageDirectory() + "/" + "Chaklabandi");
+        } else
+            Toast.makeText(LocationComponentActivity.this, "Oops!! There is no SD Card.", Toast.LENGTH_SHORT).show();
 
-
-            if (!apkStorage.exists()) {
-                apkStorage.mkdir();
-                Toast.makeText(LocationComponentActivity.this, "Dir created"+apkStorage, Toast.LENGTH_LONG).show();
-                Log.e("file dir", "dir"+apkStorage);
-            }
-
-            FileWriter file = new FileWriter(apkStorage + "/filename");
-            file.write("what you want to write in internal storage");
-            file.flush();
-            file.close();
-        } catch (IOException e) {
-            e.printStackTrace();
+        //If File is not present create directory
+        if (!apkStorage.exists()) {
+            apkStorage.mkdir();
+            Log.e(TAG, "Directory Created.");
         }
     }
+
+    @Override
+    public boolean onMarkerClick(@NonNull Marker marker) {
+        new SweetAlertDialog(LocationComponentActivity.this, SweetAlertDialog.WARNING_TYPE)
+                                            .setTitleText(marker.getTitle())
+                                            .setContentText(marker.getSnippet())
+                                            .setConfirmText("Mark!")
+                                            .setConfirmClickListener(new SweetAlertDialog.OnSweetClickListener() {
+                                                @Override
+                                                public void onClick(SweetAlertDialog sDialog) {
+                                                    IconFactory iconFactory = IconFactory.getInstance(LocationComponentActivity.this);
+                                                    Icon icon = iconFactory.fromResource(R.drawable.blue_pin_marker);
+                                                    String sentence=marker.getTitle();
+                                                    String search ="Done";
+                                                    if ( sentence.toLowerCase().indexOf(search.toLowerCase()) != -1 ) {
+
+                                                        Toast.makeText(LocationComponentActivity.this, "You Already Marked this point", Toast.LENGTH_LONG).show();
+                                                    } else {
+
+                                                        marker.setTitle(marker.getTitle()+" Done");
+                                                        marker.setIcon(icon);
+                                                        iconOffset(new Float[] {0f, -8f});
+                                                        count=count+1;
+                                                        poicount.setText("Completed: "+Integer.toString(count)+" /"+Integer.toString(totalpoi));
+                                                        Toast.makeText(LocationComponentActivity.this, "Point marked as Done"+Integer.toString(count), Toast.LENGTH_LONG).show();
+                                                    }
+
+                                                    sDialog.dismissWithAnimation();
+
+                                                }
+                                            })
+                                            .setCancelButton("Cancel", new SweetAlertDialog.OnSweetClickListener() {
+                                                @Override
+                                                public void onClick(SweetAlertDialog sDialog) {
+                                                    sDialog.dismissWithAnimation();
+                                                }
+                                            })
+                                            .show();
+
+        return false;
+    }
+
     public class CheckForSDCard {
         //Check If SD Card is present or not method
         public boolean isSDCardPresent() {
@@ -436,70 +458,95 @@ public class LocationComponentActivity extends AppCompatActivity implements
             return false;
         }
     }
+
     public void jsonbackground(String fileename, String filetype){
         mapboxMap.getStyle(new Style.OnStyleLoaded() {
             @Override
             public void onStyleLoaded(@NonNull Style style) {
                 String data = getAssetJsonData(getApplicationContext(),fileename);
                 FeatureCollection featureCollection = FeatureCollection.fromJson(data);
-
-
-//
-
                 if(filetype=="line"){
                     if (style.getSourceAs("line-source")!=null){
-
-
+                        Toast.makeText(LocationComponentActivity.this, "line source is not null", Toast.LENGTH_LONG).show();
+                        style.removeLayer("line-layer");
+                        style.removeSource("line-source");
                     }
                     else{
-                        style.removeLayer("line-layer");
                         GeoJsonSource geoJsonSource = new GeoJsonSource("line-source", featureCollection);
                         style.addSource(geoJsonSource);
                         LineLayer lineLayer = new LineLayer("line-layer", "line-source");
-                        lineLayer.setProperties(
-//                                PropertyFactory.lineDasharray(new Float[]{0.01f, 2f}),
+                        lineLayer.setProperties(//                                PropertyFactory.lineDasharray(new Float[]{0.01f, 2f}),
                                 PropertyFactory.lineCap(Property.LINE_CAP_SQUARE),
                                 PropertyFactory.lineJoin(Property.LINE_JOIN_MITER),
                                 PropertyFactory.lineWidth(2f),
                                 PropertyFactory.lineOpacity(.7f),
                                 PropertyFactory.lineColor(Color.parseColor("#e55e5e"))
-
                         );
                         style.addLayer(lineLayer);
                     }
-
                 }
                 else if(filetype=="point"){
-
-
                     if (style.getSourceAs("point-source")!=null){
-
+                        style.removeLayer("layer-point");
+                        style.removeSource("point-source");
+                        mapboxMap.clear();
 
                     }
                     else{
-                        style.removeLayer("layer-id");
                         GeoJsonSource geoJsonSource = new GeoJsonSource("point-source", featureCollection);
+                        totalpoi=featureCollection.features().size();
                         style.addSource(geoJsonSource);
-                        style.addImage(("marker_icon"), BitmapFactory.decodeResource(
-                                getResources(), R.drawable.red_marker));
-                        SymbolLayer symbolLayer = new SymbolLayer("layer-id", "point-source")
-                                .withProperties(PropertyFactory.iconImage("marker_icon"),PropertyFactory.textField(Expression.get("sn")),PropertyFactory.iconOffset(new Float[] {0f, -8f}));
+                        SymbolLayer symbolLayer = new SymbolLayer("layer-point", "point-source")
+                                .withProperties(PropertyFactory.textField(Expression.get("sn")));
                         style.addLayer(symbolLayer);
 
 
+//                        PropertyFactory.iconOffset(new Float[] {0f, -8f})
+                        mapboxMap.setOnMarkerClickListener(LocationComponentActivity.this);
+                        manualaddpoint(fileename);
+//                        style.addImage(("marker_icon_red"), BitmapFactory.decodeResource(
+//                                getResources(), R.drawable.red_marker));
+//                        style.addImage(("marker_icon_blue"), BitmapFactory.decodeResource(
+//                                getResources(), R.drawable.blue_marker));
+//                        SymbolLayer symbolLayer = new SymbolLayer("layer-id", "point-source")
+//                                .withProperties(PropertyFactory.iconImage("marker_icon_red"),PropertyFactory.textField(Expression.get("sn")),PropertyFactory.iconOffset(new Float[] {0f, -8f}));
+//                        style.addLayer(symbolLayer);
+//                        mapboxMap.addOnMapClickListener(new MapboxMap.OnMapClickListener() {
+//                            @Override
+//                            public boolean onMapClick(@NonNull LatLng point) {
+//                                PointF screenPoint = mapboxMap.getProjection().toScreenLocation(point);
+//                                List<Feature> features = mapboxMap.queryRenderedFeatures(screenPoint, "layer-id");
+//                                if (!features.isEmpty()) {
+//                                    Feature selectedFeature = features.get(0);
+////                                    String title = selectedFeature.getStringProperty("sn");
+////                                    Toast.makeText(LocationComponentActivity.this, "You selected " + title, Toast.LENGTH_SHORT).show();
+//                                    new SweetAlertDialog(LocationComponentActivity.this, SweetAlertDialog.WARNING_TYPE)
+//                                            .setTitleText("Point :"+selectedFeature.properties().get("status"))
+//                                            .setContentText("X : " + selectedFeature.getStringProperty("X") + ", Y: " + selectedFeature.getStringProperty("Y") + " , Z: " + selectedFeature.getStringProperty("Z"))
+//                                            .setConfirmText("Mark!")
+//                                            .setConfirmClickListener(new SweetAlertDialog.OnSweetClickListener() {
+//                                                @Override
+//                                                public void onClick(SweetAlertDialog sDialog) {
+//                                                    if(selectedFeature.getStringProperty("status")==null){
+//                                                    }
+//                                                }
+//                                            })
+//                                            .setCancelButton("Cancel", new SweetAlertDialog.OnSweetClickListener() {
+//                                                @Override
+//                                                public void onClick(SweetAlertDialog sDialog) {
+//                                                    sDialog.dismissWithAnimation();
+//                                                }
+//                                            })
+//                                            .show();
+//                                }
+//                                return false;
+//                            }
+//                        });
                     }
-
                 }
-
             }
         });
-
-
-
-
     }
-
-
     private void initSearchFab() {
         findViewById(R.id.fab_location_search).setOnClickListener(new View.OnClickListener() {
             @Override
@@ -518,22 +565,6 @@ public class LocationComponentActivity extends AppCompatActivity implements
         });
     }
 
-    private void addUserLocations() {
-        home = CarmenFeature.builder().text("Mapbox SF Office")
-                .geometry(Point.fromLngLat(-122.3964485, 37.7912561))
-                .placeName("50 Beale St, San Francisco, CA")
-                .id("mapbox-sf")
-                .properties(new JsonObject())
-                .build();
-
-        work = CarmenFeature.builder().text("Mapbox DC Office")
-                .placeName("740 15th Street NW, Washington DC")
-                .geometry(Point.fromLngLat(-77.0338348, 38.899750))
-                .id("mapbox-dc")
-                .properties(new JsonObject())
-                .build();
-    }
-
     private void setUpSource(@NonNull Style loadedMapStyle) {
         loadedMapStyle.addSource(new GeoJsonSource(geojsonSourceLayerId));
     }
@@ -541,10 +572,9 @@ public class LocationComponentActivity extends AppCompatActivity implements
     private void setupLayer(@NonNull Style loadedMapStyle) {
         loadedMapStyle.addLayer(new SymbolLayer("SYMBOL_LAYER_ID", geojsonSourceLayerId).withProperties(
                 iconImage(symbolIconId),
-                iconOffset(new Float[] {0f, -8f})
+                iconOffset(new Float[]{0f, -8f})
         ));
     }
-
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
@@ -564,133 +594,82 @@ public class LocationComponentActivity extends AppCompatActivity implements
                         source.setGeoJson(FeatureCollection.fromFeatures(
                                 new Feature[] {Feature.fromJson(selectedCarmenFeature.toJson())}));
                     }
-
-// Move map camera to the selected location
-                    mapboxMap.animateCamera(CameraUpdateFactory.newCameraPosition(
-                            new CameraPosition.Builder()
-                                    .target(new LatLng(((Point) selectedCarmenFeature.geometry()).latitude(),
-                                            ((Point) selectedCarmenFeature.geometry()).longitude()))
-                                    .zoom(14)
-                                    .build()), 4000);
                 }
             }
         }
     }
 
-
-    public  void getlocation(){
-        findViewById(R.id.locationbutton).setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                mapboxMap.getStyle(new Style.OnStyleLoaded() {
-                    @Override
-                    public void onStyleLoaded(@NonNull Style style) {
-
-                        enableLocationComponent(style);
-
-                    }
-                });
-
-            }
-        });
-
-    }
     public  void designbuttonclick(View view){
         new LoadGeoJson(this).execute();
     }
-    public  void pointbuttonclick(View view) {
-        String file="poi.geojson";
-        String data = getAssetJsonData(getApplicationContext(),file);
+    public  void manualaddpoint(String inputfile) {
+        String data = getAssetJsonData(getApplicationContext(),inputfile);
         FeatureCollection featureCollection = FeatureCollection.fromJson(data);
-        IconFactory iconFactory = IconFactory.getInstance(LocationComponentActivity.this);
-        Icon icon = iconFactory.fromResource(R.drawable.blue_marker);
-
-
-
         //                    Source source = new GeoJsonSource("my.data.source", featureCollection);
         for (Feature feature : featureCollection.features()) {
-            initialcount=initialcount+1;
             mapboxMap.addMarker(new MarkerOptions()
+//                    .position(new LatLng(feature.geometry())
                     .position(new LatLng(feature.getProperty("lat").getAsFloat(),
                             feature.getProperty("lon").getAsFloat()))
                     .snippet("X : " + feature.getStringProperty("X") + " , Y: " + feature.getStringProperty("Y") + " , Z: " + feature.getStringProperty("Z"))
                     .title(feature.getStringProperty("sn")));
 
-            mapboxMap.setInfoWindowAdapter(new MapboxMap.InfoWindowAdapter() {
-
-                @Nullable
-                @Override
-
-                public View getInfoWindow(@NonNull Marker marker) {
-                    LinearLayout parent = new LinearLayout(LocationComponentActivity.this);
-                    parent.setLayoutParams(new LinearLayout.LayoutParams(
-                            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-                    parent.setOrientation(LinearLayout.VERTICAL);
-
-                    // Depending on the marker title, the correct image source is used. If you
-                    // have many markers using different images, extending Marker and
-                    // baseMarkerOptions, adding additional options such as the image, might be
-                    // a better choice.
-                    Button Done=new Button(LocationComponentActivity.this);
-
-                    Done.setOnClickListener(new View.OnClickListener() {
-                        public void onClick(View v) {
-
-                            // your handler code here
-                            String sentence=marker.getTitle();
-                            String search ="Done";
-                            if ( sentence.toLowerCase().indexOf(search.toLowerCase()) != -1 ) {
-
-                                Toast.makeText(LocationComponentActivity.this, "You Already Marked this point", Toast.LENGTH_LONG).show();
-
-
-                            } else {
-
-                                marker.setTitle(marker.getTitle()+" Done");
-                                Done.setText("Point Marked ");
-                                marker.setIcon(icon);
-                                count=count+1;
-                                poicount.setText("Completed: "+Integer.toString(count));
-                                poicount.setBackgroundColor(Color.parseColor("#ffffff"));
-                                Toast.makeText(LocationComponentActivity.this, "Point marked as Done"+Integer.toString(count), Toast.LENGTH_LONG).show();
-
-                            }
-
-
-                        }
-                    });
-                    TextView Title=new TextView((LocationComponentActivity.this));
-                    TextView Content=new TextView((LocationComponentActivity.this));
-                    Content.setText(marker.getSnippet());
-                    Title.setText(marker.getTitle());
-                    Title.setBackgroundColor(Color.parseColor("#ffffff"));
-                    Content.setBackgroundColor(Color.parseColor("#ffffff"));
-
-                    String sentence=marker.getTitle();
-                    String search ="Done";
-                    if ( sentence.toLowerCase().indexOf(search.toLowerCase()) != -1 ) {
-
-                        Done.setText("Point Marked ");
-
-                    } else {
-
-                        Done.setText("Mark as Done ");
-
-                    }
-
-                    parent.addView(Title);
-                    parent.addView(Content);
-                    parent.addView(Done);
-                    return parent;
-
-                    // return the view which includes the button
-
-                }
-            });
+            mapboxMap.setOnMarkerClickListener(LocationComponentActivity.this);
+//            mapboxMap.setInfoWindowAdapter(new MapboxMap.InfoWindowAdapter() {
+//                @Nullable
+//                @Override
+//                public View getInfoWindow(@NonNull Marker marker) {
+//                    LinearLayout parent = new LinearLayout(LocationComponentActivity.this);
+//                    parent.setLayoutParams(new LinearLayout.LayoutParams(
+//                            ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+//                    parent.setOrientation(LinearLayout.VERTICAL);
+//
+//                    // Depending on the marker title, the correct image source is used. If you
+//                    // have many markers using different images, extending Marker and
+//                    // baseMarkerOptions, adding additional options such as the image, might be
+//                    // a better choice.
+//                    Button Done = new Button(LocationComponentActivity.this);
+//                    Done.setText("Mark");
+//                    parent.addView(Done);
+//                    return parent;
+//
+//                    // return the view which includes the button
+//
+//                }
+//            });
+//            mapboxMap.addOnMapClickListener(new MapboxMap.OnMapClickListener() {
+//                            @Override
+//                            public boolean onMapClick(@NonNull LatLng point) {
+//                                PointF screenPoint = mapboxMap.getProjection().toScreenLocation(point);
+//                                List<Feature> features = mapboxMap.queryRenderedFeatures(screenPoint, "layer-id");
+//                                if (!features.isEmpty()) {
+//                                    Feature selectedFeature = features.get(0);
+////                                    String title = selectedFeature.getStringProperty("sn");
+////                                    Toast.makeText(LocationComponentActivity.this, "You selected " + title, Toast.LENGTH_SHORT).show();
+//                                    new SweetAlertDialog(LocationComponentActivity.this, SweetAlertDialog.WARNING_TYPE)
+//                                            .setTitleText("Point :"+selectedFeature.properties().get("status"))
+//                                            .setContentText("X : " + selectedFeature.getStringProperty("X") + ", Y: " + selectedFeature.getStringProperty("Y") + " , Z: " + selectedFeature.getStringProperty("Z"))
+//                                            .setConfirmText("Mark!")
+//                                            .setConfirmClickListener(new SweetAlertDialog.OnSweetClickListener() {
+//                                                @Override
+//                                                public void onClick(SweetAlertDialog sDialog) {
+//
+//
+//                                                }
+//                                            })
+//                                            .setCancelButton("Cancel", new SweetAlertDialog.OnSweetClickListener() {
+//                                                @Override
+//                                                public void onClick(SweetAlertDialog sDialog) {
+//                                                    sDialog.dismissWithAnimation();
+//                                                }
+//                                            })
+//                                            .show();
+//                                }
+//                                return false;
+//                            }
+//                        });
         }
     }
-
-
     private String getAssetJsonData(Context context,String filename) {
         String json;
         try {
@@ -737,7 +716,6 @@ public class LocationComponentActivity extends AppCompatActivity implements
         LoadGeoJson(LocationComponentActivity activity) {
             this.weakReference = new WeakReference<>(activity);
         }
-
         @Override
         protected FeatureCollection doInBackground(Void... voids) {
             try {
@@ -785,12 +763,20 @@ public class LocationComponentActivity extends AppCompatActivity implements
             locationComponent.setCameraMode(CameraMode.TRACKING);
 // Set the component's render mode
             locationComponent.setRenderMode(RenderMode.COMPASS);
+            initLocationEngine();
 
 
         } else {
             permissionsManager = new PermissionsManager(this);
             permissionsManager.requestLocationPermissions(this);
         }
+    }
+    @SuppressLint("MissingPermission")
+    private void initLocationEngine(){
+        locationEngine= LocationEngineProvider.getBestLocationEngine(this);
+        LocationEngineRequest request = new LocationEngineRequest.Builder(DEFAULT_INTERVAL_IN_MILISECONDS).setPriority(LocationEngineRequest.PRIORITY_HIGH_ACCURACY).setMaxWaitTime(DEFAULT_MAX_WAIT_TIME).build();
+        locationEngine.requestLocationUpdates(request,callback,getMainLooper());
+        locationEngine.getLastLocation(callback);
     }
 
     @Override
@@ -816,6 +802,38 @@ public class LocationComponentActivity extends AppCompatActivity implements
         } else {
             Toast.makeText(this, R.string.user_location_permission_not_granted, Toast.LENGTH_LONG).show();
             finish();
+        }
+    }
+    private static class LocationComponentActivityLocationCallback implements LocationEngineCallback<LocationEngineResult>{
+        private final WeakReference<LocationComponentActivity> activityWeakReference;
+        LocationComponentActivityLocationCallback(LocationComponentActivity activity){
+            this.activityWeakReference= new WeakReference<>(activity);
+        }
+        @Override
+        public void onSuccess(LocationEngineResult result){
+            LocationComponentActivity activity= activityWeakReference.get();
+            if(activity!=null){
+                Location location=result.getLastLocation();
+                if (location == null){
+                    return;
+                }
+
+                if(activity.mapboxMap !=null && result.getLastLocation()!= null){
+                    activity.mapboxMap.getLocationComponent().forceLocationUpdate(result.getLastLocation());
+                }
+            }
+        }
+
+        @Override
+        public void onFailure(@NonNull Exception exception) {
+            Log.d("LocationChangeActivity",exception.getLocalizedMessage());
+            LocationComponentActivity activity = activityWeakReference.get();
+            if (activity != null) {
+                Toast.makeText(activity, exception.getLocalizedMessage(),
+                        Toast.LENGTH_SHORT).show();
+            }
+
+
         }
     }
 
@@ -858,7 +876,11 @@ public class LocationComponentActivity extends AppCompatActivity implements
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        if(locationEngine!= null){
+            locationEngine.removeLocationUpdates(callback);
+        }
         mapView.onDestroy();
+
     }
 
     @Override
