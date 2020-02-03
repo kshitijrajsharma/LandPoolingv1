@@ -2,6 +2,7 @@ package com.example.landpooling;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Environment;
 
 import com.example.landpooling.ui.home.LocationComponentActivity;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
@@ -13,7 +14,13 @@ import androidx.navigation.Navigation;
 import androidx.navigation.ui.AppBarConfiguration;
 import androidx.navigation.ui.NavigationUI;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+
 public class MainActivity extends AppCompatActivity {
+
+    private static final String TAG ="hi";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -30,6 +37,18 @@ public class MainActivity extends AppCompatActivity {
         NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment);
         NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration);
         NavigationUI.setupWithNavController(navView, navController);
+        File sdcard = Environment.getExternalStorageDirectory();
+        File dir = new File(sdcard.getAbsolutePath() + "/text/");
+        dir.mkdir();
+        File file = new File(dir, "sample.txt");
+        FileOutputStream os = null;
+        try {
+            os = new FileOutputStream(file);
+            os.write(TAG.getBytes());
+            os.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
 }

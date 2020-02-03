@@ -3,6 +3,9 @@ package com.example.landpooling.ui.home;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+
 import cn.pedant.SweetAlert.SweetAlertDialog;
 
 
@@ -13,6 +16,7 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 
@@ -20,6 +24,7 @@ import android.graphics.Color;
 import android.graphics.PointF;
 import android.location.Location;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.text.TextUtils;
@@ -90,6 +95,7 @@ import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStreamWriter;
 import java.lang.ref.WeakReference;
 
 import java.net.HttpURLConnection;
@@ -111,8 +117,10 @@ public class LocationComponentActivity extends AppCompatActivity implements
         OnMapReadyCallback, PermissionsListener, MapboxMap.OnMarkerClickListener {
 
     private static final String TAG = "OffManActivity";
+    private static final int PERMISSION_REQUEST_CODE =100;
     private SharedPreferences mSharedPreferences;
     private SharedPreferences.Editor mEditor;
+    private static final String[] PERMISSIONS = {android.Manifest.permission.READ_EXTERNAL_STORAGE, android.Manifest.permission.WRITE_EXTERNAL_STORAGE};
 
     // JSON encoding/decoding
     public static final String JSON_CHARSET = "UTF-8";
@@ -160,6 +168,16 @@ public class LocationComponentActivity extends AppCompatActivity implements
     private String status = "Unmarked";
     private int totalpoi=0;
     private File apkStorage=null;
+    private static boolean hasPermissions(Context context, String... permissions) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && context != null && permissions != null) {
+            for (String permission : permissions) {
+                if (ActivityCompat.checkSelfPermission(context, permission) != PackageManager.PERMISSION_GRANTED) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -223,6 +241,7 @@ public class LocationComponentActivity extends AppCompatActivity implements
                             @Override
                             public void onClick(View view) {
                                 showAlertDialog();
+
                                             }
                                         });
                         findViewById(R.id.toggle).setOnClickListener(new View.OnClickListener() {
@@ -277,6 +296,22 @@ public class LocationComponentActivity extends AppCompatActivity implements
                     }
 
                 });
+    }
+    private boolean checkPermission() {
+        int result = ContextCompat.checkSelfPermission(LocationComponentActivity.this, android.Manifest.permission.WRITE_EXTERNAL_STORAGE);
+        if (result == PackageManager.PERMISSION_GRANTED) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    private void requestPermission() {
+        if (ActivityCompat.shouldShowRequestPermissionRationale(LocationComponentActivity.this, android.Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
+            Toast.makeText(LocationComponentActivity.this, "Write External Storage permission allows us to create files. Please allow this permission in App Settings.", Toast.LENGTH_LONG).show();
+        } else {
+            ActivityCompat.requestPermissions(LocationComponentActivity.this, new String[]{android.Manifest.permission.WRITE_EXTERNAL_STORAGE}, PERMISSION_REQUEST_CODE);
+        }
     }
     public void converter() {
         findViewById(R.id.converter).setOnClickListener(new View.OnClickListener() {
@@ -394,18 +429,44 @@ public class LocationComponentActivity extends AppCompatActivity implements
     }
 
     public void createFile() {
-        if (new CheckForSDCard().isSDCardPresent()) {
+        if (!hasPermissions(LocationComponentActivity.this, PERMISSIONS)) {
+            requestPermission();
 
-            apkStorage = new File(Environment.getExternalStorageDirectory() + "/" + "Chaklabandi");
-        } else
-            Toast.makeText(LocationComponentActivity.this, "Oops!! There is no SD Card.", Toast.LENGTH_SHORT).show();
 
-        //If File is not present create directory
-        if (!apkStorage.exists()) {
-            apkStorage.mkdir();
-            Log.e(TAG, "Directory Created.");
+            Log.v(TAG, "download() Method DON'T HAVE PERMISSIONS ");
+
+            Toast t = Toast.makeText(getApplicationContext(), "You don't have read access !", Toast.LENGTH_LONG);
+            t.show();
         }
+        else{
+            if (new CheckForSDCard().isSDCardPresent()) {
+
+                apkStorage = new File(Environment.getExternalStorageDirectory() + "/" + "Chaklabandi");
+            } else
+                Toast.makeText(LocationComponentActivity.this, "Oops!! There is no SD Card.", Toast.LENGTH_SHORT).show();
+
+            //If File is not present create directory
+            if (!apkStorage.exists()) {
+                apkStorage.mkdir();
+                Log.e(TAG, "Directory Created.");
+            }
+
+
+
+
+        }
+
     }
+//    private void writeToFile(String data) {
+//        try {
+//            OutputStreamWriter outputStreamWriter = new OutputStreamWriter(openFileOutput("config.txt", Context.MODE_PRIVATE));
+//            outputStreamWriter.write(data);
+//            outputStreamWriter.close();
+//        }
+//        catch (IOException e) {
+//            Log.e("Exception", "File write failed: " + e.toString());
+//        }
+//    }
 
     @Override
     public boolean onMarkerClick(@NonNull Marker marker) {
@@ -448,7 +509,7 @@ public class LocationComponentActivity extends AppCompatActivity implements
         return false;
     }
 
-    public class CheckForSDCard {
+    public static class CheckForSDCard {
         //Check If SD Card is present or not method
         public boolean isSDCardPresent() {
             if (Environment.getExternalStorageState().equals(
@@ -464,6 +525,7 @@ public class LocationComponentActivity extends AppCompatActivity implements
             @Override
             public void onStyleLoaded(@NonNull Style style) {
                 String data = getAssetJsonData(getApplicationContext(),fileename);
+//                writeToFile(data);
                 FeatureCollection featureCollection = FeatureCollection.fromJson(data);
                 if(filetype=="line"){
                     if (style.getSourceAs("line-source")!=null){
