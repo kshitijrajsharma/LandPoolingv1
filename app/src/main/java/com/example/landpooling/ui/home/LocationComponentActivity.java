@@ -210,6 +210,7 @@ public class LocationComponentActivity extends AppCompatActivity implements
                     @Override
                     public void onStyleLoaded(@NonNull Style style) {
                         initSearchFab();
+                        addUserLocations();
 
 
 // Add the symbol layer icon to map for future use
@@ -297,6 +298,7 @@ public class LocationComponentActivity extends AppCompatActivity implements
 
                 });
     }
+
     private boolean checkPermission() {
         int result = ContextCompat.checkSelfPermission(LocationComponentActivity.this, android.Manifest.permission.WRITE_EXTERNAL_STORAGE);
         if (result == PackageManager.PERMISSION_GRANTED) {
@@ -627,6 +629,7 @@ public class LocationComponentActivity extends AppCompatActivity implements
         });
     }
 
+
     private void setUpSource(@NonNull Style loadedMapStyle) {
         loadedMapStyle.addSource(new GeoJsonSource(geojsonSourceLayerId));
     }
@@ -656,9 +659,31 @@ public class LocationComponentActivity extends AppCompatActivity implements
                         source.setGeoJson(FeatureCollection.fromFeatures(
                                 new Feature[] {Feature.fromJson(selectedCarmenFeature.toJson())}));
                     }
+                    // Move map camera to the selected location
+                    mapboxMap.animateCamera(CameraUpdateFactory.newCameraPosition(
+                            new CameraPosition.Builder()
+                                    .target(new LatLng(((Point) selectedCarmenFeature.geometry()).latitude(),
+                                            ((Point) selectedCarmenFeature.geometry()).longitude()))
+                                    .zoom(14)
+                                    .build()), 4000);
                 }
             }
         }
+    }
+    private void addUserLocations() {
+        home = CarmenFeature.builder().text("Pokhara")
+                .geometry(Point.fromLngLat(83.9856, 28.2096))
+                .placeName("Gandaki Province, Kaski")
+                .id("mapbox-sf")
+                .properties(new JsonObject())
+                .build();
+
+        work = CarmenFeature.builder().text("Mapbox DC Office")
+                .placeName("740 15th Street NW, Washington DC")
+                .geometry(Point.fromLngLat(-77.0338348, 38.899750))
+                .id("mapbox-dc")
+                .properties(new JsonObject())
+                .build();
     }
 
     public  void designbuttonclick(View view){
