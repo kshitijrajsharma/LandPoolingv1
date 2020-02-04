@@ -30,6 +30,7 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.text.TextUtils;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -47,6 +48,7 @@ import com.mapbox.android.core.location.LocationEngineRequest;
 import com.mapbox.android.core.location.LocationEngineResult;
 import com.mapbox.android.core.permissions.PermissionsListener;
 import com.mapbox.android.core.permissions.PermissionsManager;
+import com.mapbox.android.gestures.AndroidGesturesManager;
 import com.mapbox.api.geocoding.v5.models.CarmenFeature;
 import com.mapbox.geojson.Feature;
 import com.mapbox.geojson.FeatureCollection;
@@ -169,38 +171,32 @@ public class LocationComponentActivity extends AppCompatActivity implements
         }
         return true;
     }
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         Objects.requireNonNull(getSupportActionBar()).setDisplayHomeAsUpEnabled(true);
         getSupportActionBar().setHomeButtonEnabled(true);
         getSupportActionBar().setHomeAsUpIndicator(R.drawable.branded);
-
         super.onCreate(savedInstanceState);
         Mapbox.getInstance(this, "pk.eyJ1Ijoic2tzaGl0aXoxIiwiYSI6ImNqcmJ2czBjODBhMTgzeWxwM2t1djJuaXUifQ.wlFktg-soH3B_pqVyJj2Ig");
         setContentView(R.layout.fragment_home);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         mapView = findViewById(R.id.mapView);
         poicount=findViewById(R.id.textView);
         converter();
         createFile();
         mapView.onCreate(savedInstanceState);
         mapView.getMapAsync(this);
-
     }
-
     @Override
     public void onMapReady(@NonNull final MapboxMap mapboxMap) {
         map=mapboxMap;
         LocationComponentActivity.this.mapboxMap = mapboxMap;
-
-
+        AndroidGesturesManager gesturesManager = mapboxMap.getGesturesManager();
         //        mapboxMap.setStyle(new Style.Builder().fromUri("mapbox://styles/mapbox/cjerxnqt3cgvp2rmyuxbeqme7"),
 //                new Style.OnStyleLoaded() {
         mapboxMap.setStyle(Style.OUTDOORS, style -> {
                                 initSearchFab();
                                 addUserLocations();
-
-
         // Add the symbol layer icon to map for future use
                                 style.addImage(symbolIconId, BitmapFactory.decodeResource(
                                         LocationComponentActivity.this.getResources(), R.drawable.blue_marker));
@@ -230,14 +226,11 @@ public class LocationComponentActivity extends AppCompatActivity implements
                                     if (satellite % 2 == 0) {
                                         mapboxMap.setStyle(Style.OUTDOORS, style12 -> {
                                         });
-
                                     } else {
                                         mapboxMap.setStyle(Style.SATELLITE_STREETS, style1 -> {
                                         });
                                     }
-
                                 });
-
                                 progressBar = findViewById(R.id.progress_bar);
                                 offlineManager = OfflineManager.getInstance(LocationComponentActivity.this);
                                 downloadButton = findViewById(R.id.download_button);
@@ -245,12 +238,8 @@ public class LocationComponentActivity extends AppCompatActivity implements
         // List offline regions
                                 listButton =  findViewById(R.id.list_button);
                                 listButton.setOnClickListener(view -> downloadedRegionList());
-
-
-
                             });
     }
-
     private void requestPermission() {
         if (ActivityCompat.shouldShowRequestPermissionRationale(LocationComponentActivity.this, android.Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
             Toast.makeText(LocationComponentActivity.this, "Write External Storage permission allows us to create files. Please allow this permission in App Settings.", Toast.LENGTH_LONG).show();
@@ -260,9 +249,7 @@ public class LocationComponentActivity extends AppCompatActivity implements
     }
     private void converter() {
         findViewById(R.id.converter).setOnClickListener(new View.OnClickListener() {
-
             private String m_Text = "";
-
             @Override
             public void onClick(View v) {
                 AlertDialog.Builder builder = new AlertDialog.Builder(LocationComponentActivity.this);
@@ -280,7 +267,6 @@ public class LocationComponentActivity extends AppCompatActivity implements
                 final Button newbutton= new Button(LocationComponentActivity.this);
                 newbutton.setOnClickListener(v1 -> {
                     m_Text=input.getText().toString();
-
                     if(input.getText()!=null && !TextUtils.isEmpty(m_Text)){
                         double f1 = Double.parseDouble(m_Text);
                         double ropani=f1*0.0019656406022723;
