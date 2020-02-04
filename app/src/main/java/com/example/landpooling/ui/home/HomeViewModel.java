@@ -1,4 +1,4 @@
-package com.example.myapplication.ui.home;
+package com.example.landpooling.ui.home;
 
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;

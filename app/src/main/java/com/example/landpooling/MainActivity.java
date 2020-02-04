@@ -37,18 +37,7 @@ public class MainActivity extends AppCompatActivity {
         NavController navController = Navigation.findNavController(this, R.id.nav_host_fragment);
         NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration);
         NavigationUI.setupWithNavController(navView, navController);
-        File sdcard = Environment.getExternalStorageDirectory();
-        File dir = new File(sdcard.getAbsolutePath() + "/text/");
-        dir.mkdir();
-        File file = new File(dir, "sample.txt");
-        FileOutputStream os = null;
-        try {
-            os = new FileOutputStream(file);
-            os.write(TAG.getBytes());
-            os.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+
     }
 
 }

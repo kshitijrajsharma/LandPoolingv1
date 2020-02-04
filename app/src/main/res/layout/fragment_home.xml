@@ -11,7 +11,6 @@
         app:elevation="0dp">
 
         <androidx.appcompat.widget.Toolbar
-            android:id="@+id/app_bar"
             style="@style/Widget.Shrine.Toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
@@ -27,8 +26,11 @@
     <com.mapbox.mapboxsdk.maps.MapView
         android:id="@+id/mapView"
         android:layout_width="match_parent"
-        app:mapbox_cameraZoom="15"
-        android:layout_height="match_parent" >
+        android:layout_height="match_parent"
+        app:mapbox_cameraTargetLat="28.3949"
+        app:mapbox_cameraTargetLng="84.1240"
+        app:mapbox_cameraZoom="7"
+        >
 
 
     </com.mapbox.mapboxsdk.maps.MapView>
@@ -44,8 +46,6 @@
         android:paddingLeft="25dp"
         android:paddingRight="25dp"
         android:visibility="gone" />
-
-
 <RelativeLayout
     android:layout_width="wrap_content"
     android:layout_height="wrap_content">
@@ -111,8 +111,7 @@
         android:layout_below="@id/locationbutton"
         android:layout_marginEnd="10dp"
         android:layout_marginRight="10dp"
-        android:textColor="@color/mapbox_plugins_white"
-        android:background="@drawable/white_circle_drawable"
+
 
         />
 
@@ -129,7 +128,6 @@
 
 
     <LinearLayout
-        android:id="@+id/bottom_navigation"
         style="?android:attr/buttonBarStyle"
         android:layout_width="match_parent"
         android:layout_height="56dp"
@@ -138,7 +136,8 @@
         android:background="@color/textColorPrimary"
         android:elevation="8dp"
         android:orientation="horizontal"
-        android:paddingTop="8dp">
+        android:paddingTop="8dp"
+        tools:targetApi="lollipop">
 
         <Button
             android:id="@+id/download_button"
@@ -148,6 +147,7 @@
             android:layout_weight="1"
             android:background="@android:color/transparent"
             android:clickable="true"
+            android:focusable="true"
             android:drawableLeft="@android:drawable/ic_menu_save"
             android:drawableTop="@color/mapbox_plugins_white"
             android:gravity="center"
